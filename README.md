@@ -1,6 +1,23 @@
 # Jetflare
 
-A type-safe API client for modern web applications. Jetflare provides a clean, intuitive interface for HTTP requests, WebSocket connections, Server-Sent Events, file uploads, and intelligent caching - all with full TypeScript support.
+A type-safe API client web applications.
+
+Jetflare provides a clean, intuitive interface for HTTP requests, WebSocket connections, Server-Sent Events, file uploads, and intelligent caching - all with full TypeScript support.
+
+<div align="center">
+  <a href="https://npm-stat.com/charts.html?package=jetflare">
+    <img src="https://img.shields.io/npm/dm/jetflare" alt="Downloads per Month"/>
+  </a>
+  <a href="https://npm-stat.com/charts.html?package=jetflare">
+    <img src="https://img.shields.io/npm/dy/jetflare" alt="Downloads per Year"/>
+  </a>
+  <a href="https://badge.fury.io/js/jetflare">
+    <img src="https://badge.fury.io/js/jetflare.svg" alt="npm version">
+  </a>
+  <a href="https://github.com/codedynasty-dev/jetflare">
+    <img src="https://img.shields.io/github/stars/codedynasty-dev/jetflare?style=social" alt="Stars"/>
+  </a>
+</div>
 
 ## Table of Contents
 

@@ -1,0 +1,29 @@
+{
+  "name": "jetflare",
+  "version": "0.0.0",
+  "description": "A type-safe API client for modern web applications. Jetflare provides a clean, intuitive interface for HTTP requests, WebSocket connections, Server-Sent Events, file uploads, and intelligent caching - all with full TypeScript support.",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codedynasty-dev/jetflare.git"
+  },
+  "keywords": [
+    "api",
+    "client",
+    "typescript",
+    "http",
+    "websocket",
+    "caching"
+  ],
+  "author": "friday candour fridaycandours@gmail.com",
+  "license": "Apache",
+  "bugs": {
+    "url": "https://github.com/codedynasty-dev/jetflare/issues"
+  },
+  "homepage": "https://jetpath.codedynasty.dev",
+  "scripts": {
+    "prepare": "tsc --project tsconfig.json"
+  }
+}

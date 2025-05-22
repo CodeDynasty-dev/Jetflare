@@ -975,5 +975,3 @@ function setupFileUpload() {
   });
 }
 ```
-
-This comprehensive documentation covers all aspects of using Jetflare API Client. The library is designed to be intuitive and powerful, handling everything from simple REST API calls to complex real-time communications with minimal configuration.

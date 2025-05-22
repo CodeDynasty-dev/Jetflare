@@ -1,6 +1,6 @@
 {
   "name": "jetflare",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A type-safe API client web applications.",
   "files": [
     "dist"

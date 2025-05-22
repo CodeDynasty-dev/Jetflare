@@ -51,7 +51,7 @@ pnpm add jetflare
 Define your API routes and start making requests:
 
 ```typescript
-import { Jetflare, api } from "jetflare";
+import { Jetflare } from "jetflare";
 
 // Define your API routes
 export const routes = {
@@ -63,19 +63,18 @@ export const routes = {
   POST_user: {
     path: "/users",
     method: "post",
-    invalidates: ["users-list"],
     title: "Create new user",
   },
 } as const;
 
 // Initialize Jetflare with your routes
-const jetflare = new Jetflare("https://api.example.com");
+const jetflare = Jetflare("https://api.example.com", routes);
 
 // Make requests
-const users = await jet.GET_users();
+const users = await jetflare.GET_users();
 const userData = await users.json();
 
-const newUser = await jet.POST_user({
+const newUser = await jetflare.POST_user({
   body: { name: "John Doe", email: "john@example.com" },
 });
 ```
@@ -87,11 +86,15 @@ Routes are defined as objects with the following properties:
 ```typescript
 const routes = {
   ROUTE_NAME: {
-    path: string, // API endpoint path
-    method: string, // HTTP method or 'websocket'/'sse'
-    headers: object, // Default headers for this route
-    title: string, // Description for documentation
+    title: string,
+    path: string,
+    method: string,
+    headers: object,
+    body: object;
+    query: object;
+    params: object;
   },
+ // ... more
 };
 ```
 
@@ -103,7 +106,6 @@ export const routes = {
   GET_users: {
     path: "/users",
     method: "get",
-    cache: { ttl: 300000, key: "users-list" },
     title: "Get all users",
   },
 
@@ -111,7 +113,6 @@ export const routes = {
   GET_user: {
     path: "/users/:id",
     method: "get",
-    cache: { ttl: 60000, key: "user-:id" },
     title: "Get user by ID",
   },
 
@@ -119,8 +120,11 @@ export const routes = {
   POST_user: {
     path: "/users",
     method: "post",
-    invalidates: ["users-list"],
     title: "Create new user",
+    body: {
+      name: "string",
+      email: "string",
+    },
   },
 
   // File upload endpoint
@@ -153,11 +157,11 @@ export const routes = {
 
 ```typescript
 // GET request
-const response = await jet.GET_users();
+const response = await jetflare.GET_users();
 const users = await response.json();
 
 // POST request with body
-const response = await jet.POST_user({
+const response = await jetflare.POST_user({
   body: {
     name: "Jane Smith",
     email: "jane@example.com",
@@ -165,7 +169,7 @@ const response = await jet.POST_user({
 });
 
 // Request with query parameters
-const response = await jet.GET_users({
+const response = await jetflare.GET_users({
   query: {
     limit: 10,
     offset: 0,
@@ -174,7 +178,7 @@ const response = await jet.GET_users({
 });
 
 // Request with path parameters
-const response = await jet.GET_user({
+const response = await jetflare.GET_user({
   params: { id: "12345" },
 });
 ```
@@ -184,7 +188,7 @@ const response = await jet.GET_user({
 Each request accepts a configuration object:
 
 ```typescript
-const response = await jet.GET_users({
+const response = await jetflare.GET_users({
   query: { limit: 10 }, // Query parameters
   params: { id: "123" }, // Path parameters
   headers: { "X-Custom": "value" }, // Additional headers
@@ -200,7 +204,7 @@ const response = await jet.GET_users({
 Jetflare returns an enhanced response object:
 
 ```typescript
-const response = await jet.GET_users();
+const response = await jetflare.GET_users();
 
 // Standard Response properties
 console.log(response.ok); // boolean
@@ -235,17 +239,16 @@ const routes = {
   POST_user: {
     path: "/users",
     method: "post",
-    invalidates: ["users-list"], // Clear this cache on success
   },
 };
 
 // cache
-const response = await jet.GET_users({
+const response = await jetflare.GET_users({
   cache: { ttl: 60000 }, // Cache for 1 minute
 });
 
 // Disable caching for specific request
-const response = await jet.GET_users({
+const response = await jetflare.GET_users({
   cache: false,
 });
 ```
@@ -259,10 +262,6 @@ const routes = {
   GET_user: {
     path: "/users/:id",
     method: "get",
-    cache: {
-      ttl: 60000,
-      key: "user-:id", // Becomes 'user-123' for params: { id: '123' }
-    },
   },
 };
 ```
@@ -271,15 +270,15 @@ const routes = {
 
 ```typescript
 // Clear all cache
-jet.cache.clear();
+jetflare.cache.clear();
 
 // Invalidate specific cache keys
-jet.cache.invalidate("users-list");
-jet.cache.invalidate(["user-*", "posts-*"]); // Supports patterns
+jetflare.cache.invalidate("users-list");
+jetflare.cache.invalidate(["user-*", "posts-*"]); // Supports patterns
 
 // Access cache directly
-const cached = jet.cache.get("users-list");
-jet.cache.set("custom-key", data, 60000);
+const cached = jetflare.cache.get("users-list");
+jetflare.cache.set("custom-key", data, 60000);
 ```
 
 ## File Uploads
@@ -291,13 +290,13 @@ Jetflare provides seamless file upload support with progress tracking.
 ```typescript
 // Single file upload
 const fileInput = document.querySelector('input[type="file"]');
-const response = await jet.UPLOAD_avatar({
+const response = await jetflare.UPLOAD_avatar({
   params: { id: "123" },
   files: fileInput.files[0],
 });
 
 // Multiple files
-const response = await jet.UPLOAD_documents({
+const response = await jetflare.UPLOAD_documents({
   files: fileInput.files, // FileList
   body: {
     description: "Important documents",
@@ -307,7 +306,7 @@ const response = await jet.UPLOAD_documents({
 
 // File array
 const files = [file1, file2, file3];
-const response = await jet.UPLOAD_batch({
+const response = await jetflare.UPLOAD_batch({
   files: files,
 });
 ```
@@ -315,7 +314,7 @@ const response = await jet.UPLOAD_batch({
 ### Upload Progress Tracking
 
 ```typescript
-const response = await jet.UPLOAD_avatar({
+const response = await jetflare.UPLOAD_avatar({
   params: { id: "123" },
   files: selectedFile,
   onUploadProgress: (progress) => {
@@ -360,7 +359,7 @@ const routes = {
 };
 
 // Create WebSocket connection
-const ws = jet.WS_chat();
+const ws = jetflare.WS_chat();
 const connection = ws.connect();
 
 // Listen for events
@@ -392,7 +391,7 @@ ws.close();
 ### WebSocket with Protocols
 
 ```typescript
-const ws = jet.WS_chat({
+const ws = jetflare.WS_chat({
   protocols: ["chat-v1", "chat-v2"],
 });
 ```
@@ -423,7 +422,7 @@ const routes = {
 };
 
 // Connect to event stream
-const sse = jet.SSE_notifications();
+const sse = jetflare.SSE_notifications();
 const source = sse.connect();
 
 // Listen for events
@@ -447,7 +446,7 @@ sse.close();
 ### SSE with Parameters
 
 ```typescript
-const sse = jet.SSE_notifications({
+const sse = jetflare.SSE_notifications({
   query: {
     userId: "123",
     types: ["alerts", "messages"],
@@ -463,7 +462,7 @@ Interceptors allow you to transform requests and responses globally.
 
 ```typescript
 // Add request logging
-jet.interceptors.request.add((config) => {
+jetflare.interceptors.request.add((config) => {
   console.log(`→ ${config.route.method.toUpperCase()} ${config.route.path}`);
 
   // Add timestamp to all requests
@@ -476,7 +475,7 @@ jet.interceptors.request.add((config) => {
 });
 
 // Add authentication token
-jet.interceptors.request.add((config) => {
+jetflare.interceptors.request.add((config) => {
   const token = localStorage.getItem("authToken");
   if (token) {
     config.headers = {
@@ -492,13 +491,13 @@ jet.interceptors.request.add((config) => {
 
 ```typescript
 // Add response logging
-jet.interceptors.response.add((response) => {
+jetflare.interceptors.response.add((response) => {
   console.log(`← ${response.status} ${response.statusText}`);
   return response;
 });
 
 // Handle token refresh
-jet.interceptors.response.add(async (response) => {
+jetflare.interceptors.response.add(async (response) => {
   if (response.status === 401) {
     const refreshed = await refreshAuthToken();
     if (refreshed) {
@@ -514,7 +513,7 @@ jet.interceptors.response.add(async (response) => {
 
 ```typescript
 // Global error handling
-jet.interceptors.error.add((error) => {
+jetflare.interceptors.error.add((error) => {
   console.error("API Error:", error.message);
 
   // Show user-friendly error messages
@@ -536,7 +535,7 @@ Jetflare provides convenient authentication helpers.
 
 ```typescript
 // Set bearer token
-jet.withAuth("your-jwt-token-here");
+jetflare.withAuth("your-jwt-token-here");
 // All subsequent requests will include:
 // Authorization: Bearer your-jwt-token-here
 ```
@@ -545,13 +544,13 @@ jet.withAuth("your-jwt-token-here");
 
 ```typescript
 // Custom auth headers
-jet.setDefaultHeaders({
+jetflare.setDefaultHeaders({
   "X-API-Key": "your-api-key",
   "X-Auth-Token": "your-custom-token",
 });
 
 // Or per request
-const response = await jet.GET_users({
+const response = await jetflare.GET_users({
   headers: {
     Authorization: "Custom your-token-here",
   },
@@ -565,7 +564,7 @@ const response = await jet.GET_users({
 
 ```typescript
 try {
-  const response = await jet.GET_users();
+  const response = await jetflare.GET_users();
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -586,7 +585,7 @@ try {
 ### Retry Configuration
 
 ```typescript
-const response = await jet.GET_users({
+const response = await jetflare.GET_users({
   retry: {
     attempts: 3,
     delay: 1000, // ms between attempts
@@ -599,7 +598,7 @@ const response = await jet.GET_users({
 
 ```typescript
 // Handle all API errors in one place
-jet.interceptors.error.add((error) => {
+jetflare.interceptors.error.add((error) => {
   // Log to monitoring service
   logError(error);
 
@@ -616,7 +615,7 @@ jet.interceptors.error.add((error) => {
 
 ```typescript
 // Method 1: Constructor
-const jetflare = new Jetflare("https://api.example.com");
+const jetflare = Jetflare("https://api.example.com");
 
 // Method 2: Fluent API
 const jetflare = api.setup({
@@ -629,7 +628,7 @@ const jetflare = api.setup({
 });
 
 // Method 3: Chaining
-const jetflare = new Jet()
+const jetflare = Jetflare()
   .withBaseURL("https://api.example.com")
   .withAuth("bearer-token")
   .withTimeout(15000);
@@ -653,14 +652,14 @@ const jetflare = api.setup({
 
 ```typescript
 // Set default headers for all requests
-jet.setDefaultHeaders({
+jetflare.setDefaultHeaders({
   "Content-Type": "application/json",
   "X-Client-Version": "2.1.0",
   "Accept-Language": navigator.language,
 });
 
 // Add additional headers
-jet.setDefaultHeaders({
+jetflare.setDefaultHeaders({
   "X-User-ID": getCurrentUserId(),
 });
 ```
@@ -669,41 +668,39 @@ jet.setDefaultHeaders({
 
 ```typescript
 // Global timeout
-jet.setDefaultTimeout(30000); // 30 seconds
+jetflare.setDefaultTimeout(30000); // 30 seconds
 
 // Per-request timeout
-const response = await jet.GET_users({
+const response = await jetflare.GET_users({
   timeout: 5000, // 5 seconds for this request
 });
 ```
 
 ## API Reference
 
-### Jetflare Class
-
-#### Constructor
+### Jetflare Instance
 
 ```typescript
-new Jet(origin?: string)
+const jetflare = Jetflare(origin?: string)
 ```
 
 #### Methods
 
 ```typescript
-jet.setBaseURL(url: string): void
-jet.setDefaultHeaders(headers: Record<string, string>): void
-jet.setDefaultTimeout(timeout: number): void
-jet.withAuth(token: string): Jet
-jet.withTimeout(timeout: number): Jet
-jet.withBaseURL(url: string): Jet
+jetflare.setBaseURL(url: string): void
+jetflare.setDefaultHeaders(headers: Record<string, string>): void
+jetflare.setDefaultTimeout(timeout: number): void
+jetflare.withAuth(token: string): Jet
+jetflare.withTimeout(timeout: number): Jet
+jetflare.withBaseURL(url: string): Jet
 ```
 
 #### Properties
 
 ```typescript
-jet.origin: string
-jet.cache: CacheManager
-jet.interceptors: {
+jetflare.origin: string
+jetflare.cache: CacheManager
+jetflare.interceptors: {
     request: Set<Function>,
     response: Set<Function>,
     error: Set<Function>
@@ -817,7 +814,7 @@ const jetflare = api
 class UserService {
   // Get all users (with caching)
   async getUsers(page = 1, limit = 20) {
-    const response = await jet.GET_users({
+    const response = await jetflare.GET_users({
       query: { page, limit },
     });
     return response.json();
@@ -825,7 +822,7 @@ class UserService {
 
   // Get single user (cached)
   async getUser(id: string) {
-    const response = await jet.GET_user({
+    const response = await jetflare.GET_user({
       params: { id },
     });
     return response.json();
@@ -833,7 +830,7 @@ class UserService {
 
   // Create user (invalidates cache)
   async createUser(userData: any) {
-    const response = await jet.POST_user({
+    const response = await jetflare.POST_user({
       body: userData,
     });
     return response.json();
@@ -841,7 +838,7 @@ class UserService {
 
   // Update user (invalidates cache)
   async updateUser(id: string, updates: any) {
-    const response = await jet.PUT_user({
+    const response = await jetflare.PUT_user({
       params: { id },
       body: updates,
     });
@@ -850,7 +847,7 @@ class UserService {
 
   // Delete user (invalidates cache)
   async deleteUser(id: string) {
-    const response = await jet.DELETE_user({
+    const response = await jetflare.DELETE_user({
       params: { id },
     });
     return response.ok;
@@ -858,7 +855,7 @@ class UserService {
 
   // Upload avatar with progress
   async uploadAvatar(userId: string, file: File, onProgress?: Function) {
-    const response = await jet.UPLOAD_avatar({
+    const response = await jetflare.UPLOAD_avatar({
       params: { id: userId },
       files: file,
       onUploadProgress: onProgress,
@@ -890,7 +887,7 @@ class ChatService {
   private ws: any = null;
 
   joinRoom(roomId: string, onMessage: Function) {
-    this.ws = jet.WS_chat();
+    this.ws = jetflare.WS_chat();
 
     // Connect to room
     this.ws.connect();
@@ -962,7 +959,7 @@ function setupFileUpload() {
       uploadButton.disabled = true;
       progressBar.style.display = "block";
 
-      const response = await jet.UPLOAD_documents({
+      const response = await jetflare.UPLOAD_documents({
         files: files,
         body: {
           description: "Batch upload",

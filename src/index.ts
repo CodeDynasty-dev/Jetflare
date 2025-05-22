@@ -1,8 +1,3 @@
-/**
- * A beautiful, type-safe API client that's better than tRPC
- * Features: Smart caching, file uploads, WebSocket support, interceptors, and more!
- */
-
 // Enhanced payload types
 interface ApiFunctionPayload {
   body?: any;
@@ -24,6 +19,19 @@ interface ApiFunctionPayload {
     percentage: number;
   }) => void;
 }
+
+export type routesType = Record<
+  string,
+  {
+    path: string;
+    method: "get" | "post" | "websocket" | "sse" | "put" | "delete" | "patch";
+    body?: any;
+    title?: string;
+    query?: Record<string, string>;
+    params?: Record<string, string>;
+    headers?: Record<string, string>;
+  }
+>;
 
 // Cache system
 class CacheManager {
@@ -185,7 +193,7 @@ class JetResponse {
   }
 }
 
-export class Jetflare {
+class JetflareCommon {
   origin: string;
   cache = new CacheManager();
   wsManager = new WebSocketManager();
@@ -200,20 +208,7 @@ export class Jetflare {
 
   [key: string]: any;
 
-  constructor(options: {
-    origin: string;
-    routes: Record<
-      string,
-      {
-        path: string;
-        method: string;
-        query: Record<string, any>;
-        title: string;
-        params: Record<string, any>;
-        headers?: Record<string, string>;
-      }
-    >;
-  }) {
+  constructor(options: { origin: string; routes: routesType }) {
     if (!options.origin) {
       throw new Error("Origin URL is required");
     }
@@ -234,19 +229,7 @@ export class Jetflare {
     return this as any;
   }
 
-  private setupRoutes(
-    routes: Record<
-      string,
-      {
-        path: string;
-        method: string;
-        query: Record<string, any>;
-        title: string;
-        params: Record<string, any>;
-        headers?: Record<string, string>;
-      }
-    >
-  ) {
+  private setupRoutes(routes: routesType) {
     for (const routeKey in routes) {
       if (Object.prototype.hasOwnProperty.call(routes, routeKey)) {
         const currentRouteKey = routeKey as keyof typeof routes;
@@ -541,3 +524,72 @@ export class Jetflare {
     return this;
   }
 }
+
+interface ApiFunctionPayload {
+  body?: any;
+  query?: Record<string, any>;
+  params?: Record<string, any>;
+  headers?: Record<string, string>;
+  files?: FileList | File[] | File;
+  cache?: boolean | { ttl?: number; key?: string };
+  timeout?: number;
+  retry?: boolean | { attempts?: number; delay?: number };
+  onUploadProgress?: (progress: {
+    loaded: number;
+    total: number;
+    percentage: number;
+  }) => void;
+  onDownloadProgress?: (progress: {
+    loaded: number;
+    total: number;
+    percentage: number;
+  }) => void;
+}
+type ApiFunction = (payload?: ApiFunctionPayload) => Promise<JetResponse>;
+type WebSocketFunction = (payload?: { protocols?: string | string[] }) => {
+  connect: () => WebSocket;
+  on: (event: string, handler: Function) => void;
+  off: (event: string, handler: Function) => void;
+  send: (data: any) => void;
+  close: () => void;
+};
+type SSEFunction = (payload?: ApiFunctionPayload) => {
+  connect: () => EventSource;
+  on: (event: string, handler: (event: any) => void) => void;
+  close: () => void;
+};
+
+// Main SDK type
+export type API<routes extends routesType> = {
+  [K in keyof routes]: routes[K]["method"] extends "websocket"
+    ? WebSocketFunction
+    : routes[K]["method"] extends "sse"
+    ? SSEFunction
+    : ApiFunction;
+} & {
+  origin: string;
+  cache: CacheManager;
+  interceptors: {
+    request: Set<(config: any) => any>;
+    response: Set<(response: JetResponse) => JetResponse>;
+    error: Set<(error: Error) => Error>;
+  };
+  setBaseURL: (url: string) => void;
+  setDefaultHeaders: (headers: Record<string, string>) => void;
+  setDefaultTimeout: (timeout: number) => void;
+  withAuth: (token: string) => API<routes>;
+  withTimeout: (timeout: number) => API<routes>;
+  withBaseURL: (url: string) => API<routes>;
+};
+
+// Create a Jetflare instance
+
+export const Jetflare = <T extends routesType>(
+  origin: string,
+  routes: T
+): API<T> => {
+  return new JetflareCommon({
+    routes,
+    origin: origin,
+  }) as unknown as API<T>;
+};

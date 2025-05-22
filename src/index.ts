@@ -1,10 +1,37 @@
-// Enhanced payload types
-interface ApiFunctionPayload {
-  body?: any;
-  query?: Record<string, any>;
-  params?: Record<string, any>;
+// Helper to widen literal types to their primitive types
+type WidenLiterals<T> = T extends string
+  ? string
+  : T extends number
+  ? number
+  : T extends boolean
+  ? boolean
+  : T extends null
+  ? null // Handle null explicitly
+  : T extends undefined
+  ? undefined // Handle undefined explicitly
+  : T extends object
+  ? { [K in keyof T]: WidenLiterals<T[K]> } // Recurse for objects
+  : T extends Array<infer U>
+  ? Array<WidenLiterals<U>> // Recurse for arrays
+  : T;
+
+interface ApiFunctionPayload<
+  Method extends
+    | "get"
+    | "post"
+    | "put"
+    | "delete"
+    | "websocket"
+    | "sse"
+    | "patch" = "get",
+  RBody = any,
+  RQuery = any,
+  RParams = any
+> {
+  body?: Method extends "get" | "delete" ? never : RBody;
+  query?: RQuery;
+  params?: RParams;
   headers?: Record<string, string>;
-  files?: FileList | File[] | File;
   cache?: boolean | { ttl?: number; key?: string };
   timeout?: number;
   retry?: boolean | { attempts?: number; delay?: number };
@@ -13,33 +40,29 @@ interface ApiFunctionPayload {
     total: number;
     percentage: number;
   }) => void;
-  onDownloadProgress?: (progress: {
-    loaded: number;
-    total: number;
-    percentage: number;
-  }) => void;
 }
 
-export type routesType = Record<
-  string,
-  {
-    path: string;
-    method: "get" | "post" | "websocket" | "sse" | "put" | "delete" | "patch";
-    body?: any;
-    title?: string;
-    query?: Record<string, string>;
-    params?: Record<string, string>;
-    headers?: Record<string, string>;
-  }
->;
+// Define the structure for a single route definition
+export type RouteDefinition = {
+  path: string;
+  method: "get" | "post" | "websocket" | "sse" | "put" | "delete" | "patch";
+  title?: string;
+  headers?: Record<string, string>;
+  invalidates?: string | string[];
+  body?: object; // Use object as a placeholder for inference
+  query?: object;
+  params?: object;
+};
 
-// Cache system
+// This type represents the overall routes object
+export type routesType = Record<string, RouteDefinition>;
+
+// Cache systemd
 class CacheManager {
   private cache = new Map<string, { data: any; expires: number }>();
   private maxSize = 100;
 
   set(key: string, data: any, ttl: number = 300000) {
-    // Cleanup old entries if cache is full
     if (this.cache.size >= this.maxSize) {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) {
@@ -48,7 +71,7 @@ class CacheManager {
     }
 
     this.cache.set(key, {
-      data: structuredClone(data), // Deep clone to prevent mutations
+      data: structuredClone(data),
       expires: Date.now() + ttl,
     });
   }
@@ -85,16 +108,13 @@ class CacheManager {
   }
 }
 
-// WebSocket manager
+// WebSocket managed
 class WebSocketManager {
   private connections = new Map<string, WebSocket>();
   private eventHandlers = new Map<string, Set<Function>>();
 
   connect(url: string, protocols?: string | string[]) {
-    if (this.connections.has(url)) {
-      return this.connections.get(url)!;
-    }
-
+    if (this.connections.has(url)) return;
     const ws = new WebSocket(url, protocols);
     this.connections.set(url, ws);
 
@@ -103,7 +123,10 @@ class WebSocketManager {
       this.eventHandlers.delete(url);
     };
 
-    return ws;
+    return;
+  }
+  socket(url: string) {
+    return this.connections.get(url);
   }
 
   on(url: string, event: string, handler: Function) {
@@ -255,6 +278,7 @@ class JetflareCommon {
 
       return {
         connect: () => this.wsManager.connect(wsUrl, payload.protocols),
+        socket: () => this.wsManager.socket(wsUrl),
         on: (event: string, handler: Function) =>
           this.wsManager.on(wsUrl, event, handler),
         off: (event: string, handler: Function) =>
@@ -273,8 +297,8 @@ class JetflareCommon {
       return {
         connect: () => {
           eventSource = new EventSource(url);
-          return eventSource;
         },
+        event: () => eventSource,
         on: (event: string, handler: Function) => {
           if (eventSource) {
             eventSource.addEventListener(event, handler as any);
@@ -301,7 +325,6 @@ class JetflareCommon {
         // Check cache first
         const cacheConfig = payload.cache !== false ? payload.cache : false;
         if (cacheConfig && routeDef.method.toLowerCase() === "get") {
-          // headers?
           const cacheKey = this.buildCacheKey(routeDef, payload, cacheConfig);
           const cached = this.cache.get(cacheKey);
           if (cached) {
@@ -435,39 +458,91 @@ class JetflareCommon {
     const isBodyMethod = ["POST", "PUT", "PATCH"].includes(method);
     let body: any = null;
 
-    // Handle file uploads
-    if (payload.files) {
-      const formData = new FormData();
+    const doesBodyHasFile = Object.values(payload.body || {}).some(
+      (value) => value instanceof File
+    );
+    if (doesBodyHasFile) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(method, url);
 
-      const files = Array.isArray(payload.files)
-        ? payload.files
-        : payload.files instanceof FileList
-        ? Array.from(payload.files)
-        : [payload.files];
-
-      files.forEach((file, index) => {
-        formData.append(`file${index}`, file);
-      });
-
-      // Add other body data to FormData
-      if (payload.body) {
-        for (const [key, value] of Object.entries(payload.body)) {
-          formData.append(key, String(value));
+        // Set headers
+        for (const key in headers) {
+          if (Object.prototype.hasOwnProperty.call(headers, key)) {
+            xhr.setRequestHeader(key, headers[key]);
+          }
         }
-      }
 
-      body = formData;
-      // Don't set Content-Type for FormData, let browser set it with boundary
-      delete headers["Content-Type"];
-    } else if (payload.body && isBodyMethod) {
-      if (!headers["Content-Type"]) {
-        headers["Content-Type"] = "application/json";
-      }
+        // Upload Progress
+        if (payload.onUploadProgress && xhr.upload) {
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percentage = (event.loaded / event.total) * 100;
+              payload.onUploadProgress!({
+                loaded: event.loaded,
+                total: event.total,
+                percentage: parseFloat(percentage.toFixed(2)),
+              });
+            }
+          };
+        }
 
-      body =
-        headers["Content-Type"] === "application/json"
-          ? JSON.stringify(payload.body)
-          : payload.body;
+        xhr.onload = () => {
+          const responseHeaders = xhr
+            .getAllResponseHeaders()
+            .split("\r\n")
+            .reduce((acc, current) => {
+              const [key, value] = current.split(": ");
+              if (key && value) {
+                acc[key.toLowerCase()] = value;
+              }
+              return acc;
+            }, {} as Record<string, string>);
+
+          const response = new Response(xhr.response, {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            headers: responseHeaders,
+          });
+          resolve(response);
+        };
+
+        xhr.onerror = () =>
+          reject(new Error("Network error or request failed"));
+        xhr.ontimeout = () =>
+          reject(new Error(`Request timeout after ${this.defaultTimeout}ms`));
+        xhr.onabort = () => reject(new Error("Request aborted"));
+
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(payload.body || {})) {
+          if (value instanceof File) {
+            formData.append(key, value);
+          } else if (
+            Array.isArray(value) &&
+            value.some((item) => item instanceof File)
+          ) {
+            (value as File[]).forEach((fileItem) =>
+              formData.append(key, fileItem)
+            );
+          } else {
+            formData.append(key, JSON.stringify(value)); // Stringify non-file data
+          }
+        }
+        body = formData;
+
+        xhr.send(body);
+      });
+    } else {
+      if (payload.body && isBodyMethod) {
+        if (!headers["Content-Type"]) {
+          headers["Content-Type"] = "application/json";
+        }
+
+        body =
+          headers["Content-Type"] === "application/json"
+            ? JSON.stringify(payload.body)
+            : payload.body;
+      }
     }
 
     // Setup AbortController for timeout and cancellation
@@ -481,9 +556,7 @@ class JetflareCommon {
         headers,
         body,
         signal: controller.signal,
-        // ...payload
       });
-
       clearTimeout(timeoutId);
       return response;
     } catch (error) {
@@ -507,54 +580,29 @@ class JetflareCommon {
   setDefaultTimeout(timeout: number) {
     this.defaultTimeout = timeout;
   }
-
-  // Fluent API for common patterns
-  withAuth(token: string) {
-    this.setDefaultHeaders({ Authorization: `Bearer ${token}` });
-    return this;
-  }
-
-  withTimeout(timeout: number) {
-    this.setDefaultTimeout(timeout);
-    return this;
-  }
-
-  withBaseURL(url: string) {
-    this.setBaseURL(url);
-    return this;
-  }
 }
 
-interface ApiFunctionPayload {
-  body?: any;
-  query?: Record<string, any>;
-  params?: Record<string, any>;
-  headers?: Record<string, string>;
-  files?: FileList | File[] | File;
-  cache?: boolean | { ttl?: number; key?: string };
-  timeout?: number;
-  retry?: boolean | { attempts?: number; delay?: number };
-  onUploadProgress?: (progress: {
-    loaded: number;
-    total: number;
-    percentage: number;
-  }) => void;
-  onDownloadProgress?: (progress: {
-    loaded: number;
-    total: number;
-    percentage: number;
-  }) => void;
-}
-type ApiFunction = (payload?: ApiFunctionPayload) => Promise<JetResponse>;
+// Update ApiFunction to apply WidenLiterals to the inferred types
+type ApiFunction<RouteDef extends routesType[keyof routesType]> = (
+  payload?: ApiFunctionPayload<
+    RouteDef["method"],
+    WidenLiterals<RouteDef extends { body: infer B } ? B : never>,
+    WidenLiterals<RouteDef extends { query: infer Q } ? Q : never>,
+    WidenLiterals<RouteDef extends { params: infer P } ? P : never>
+  >
+) => Promise<JetResponse>;
+
 type WebSocketFunction = (payload?: { protocols?: string | string[] }) => {
-  connect: () => WebSocket;
+  connect: () => void;
+  socket: () => WebSocket | undefined;
   on: (event: string, handler: Function) => void;
   off: (event: string, handler: Function) => void;
   send: (data: any) => void;
   close: () => void;
 };
 type SSEFunction = (payload?: ApiFunctionPayload) => {
-  connect: () => EventSource;
+  connect: () => void;
+  event: () => EventSource | null;
   on: (event: string, handler: (event: any) => void) => void;
   close: () => void;
 };
@@ -565,10 +613,11 @@ export type API<routes extends routesType> = {
     ? WebSocketFunction
     : routes[K]["method"] extends "sse"
     ? SSEFunction
-    : ApiFunction;
+    : ApiFunction<routes[K]>;
 } & {
   origin: string;
   cache: CacheManager;
+  wsManager: WebSocketManager;
   interceptors: {
     request: Set<(config: any) => any>;
     response: Set<(response: JetResponse) => JetResponse>;
@@ -582,8 +631,12 @@ export type API<routes extends routesType> = {
   withBaseURL: (url: string) => API<routes>;
 };
 
-// Create a Jetflare instance
+// Helper function to define routes with strong inference
+export function createRoutes<T extends routesType>(routes: T): T {
+  return routes;
+}
 
+// Create a Jetflare instance
 export const Jetflare = <T extends routesType>(
   origin: string,
   routes: T

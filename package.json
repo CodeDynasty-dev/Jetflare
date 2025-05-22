@@ -24,6 +24,8 @@
   },
   "homepage": "https://jetpath.codedynasty.dev",
   "scripts": {
-    "prepare": "tsc --project tsconfig.json"
+    "prepare": "tsc --project tsconfig.json",
+    "test": "bun test",
+    "build": "npm pack"
   }
 }

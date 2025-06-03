@@ -750,9 +750,7 @@ jetflare.setDefaultHeaders({
 jetflare.setDefaultTimeout(15000);
 
 // Update the base URL dynamically
-jetflare.setBaseURL(
-  "[https://new-api.example.com/v2](https://new-api.example.com/v2)"
-);
+jetflare.setBaseURL("https://new-api.example.com/v2");
 ```
 
 ### Fluent API
@@ -766,13 +764,7 @@ const baseRoutes = createRoutes({
   /* ... your routes ... */
 });
 
-const jetflare = Jetflare(
-  "[https://api.example.com](https://api.example.com)",
-  baseRoutes
-)
-  .withAuth("your-jwt-token-here") // Sets Authorization: Bearer token
-  .withTimeout(20000) // Sets default timeout to 20 seconds
-  .withBaseURL("[https://prod-api.example.com](https://prod-api.example.com)"); // Changes the base URL
+const jetflare = Jetflare("https://api.example.com", baseRoutes);
 ```
 
 ## Error Handling

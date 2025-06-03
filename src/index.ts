@@ -626,9 +626,6 @@ export type API<routes extends routesType> = {
   setBaseURL: (url: string) => void;
   setDefaultHeaders: (headers: Record<string, string>) => void;
   setDefaultTimeout: (timeout: number) => void;
-  withAuth: (token: string) => API<routes>;
-  withTimeout: (timeout: number) => API<routes>;
-  withBaseURL: (url: string) => API<routes>;
 };
 
 // Helper function to define routes with strong inference

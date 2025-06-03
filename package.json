@@ -28,6 +28,6 @@
   "scripts": {
     "prepare": "tsc --project tsconfig.json",
     "test": "bun test",
-    "build": "npm pack"
+    "compile": "npm pack"
   }
 }

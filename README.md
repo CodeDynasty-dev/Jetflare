@@ -1,242 +1,191 @@
 # Jetflare
 
-A type-safe API client for web applications.
+[![npm](https://img.shields.io/npm/v/jetflare.svg)](https://www.npmjs.com/package/jetflare)
+[![npm](https://img.shields.io/npm/dm/jetflare)](https://npm-stat.com/charts.html?package=jetflare)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Jetflare provides a clean, intuitive interface for HTTP requests, WebSocket connections, Server-Sent Events, file uploads, and intelligent caching - all with full TypeScript support.
+Jetflare is a super lightweight, type-safe HTTP client for TypeScript and JavaScript, featuring:
 
-<div align="center">
-  <a href="https://npm-stat.com/charts.html?package=jetflare">
-    <img src="https://img.shields.io/npm/dm/jetflare" alt="Downloads per Month"/>
-  </a>
-  <a href="https://npm-stat.com/charts.html?package=jetflare">
-    <img src="https://img.shields.io/npm/dy/jetflare" alt="Downloads per Year"/>
-  </a>
-  <a href="https://badge.fury.io/js/jetflare">
-    <img src="https://badge.fury.io/js/jetflare.svg" alt="npm version">
-  </a>
-  <a href="https://github.com/codedynasty-dev/jetflare">
-    <img src="https://img.shields.io/github/stars/codedynasty-dev/jetflare?style=social" alt="Stars"/>
-  </a>
-</div>
+- 🚀 **Type-Safe API** - Full TypeScript support with automatic type inference
+- ⚡ **Real-Time Ready** - Built-in WebSocket and SSE support
+- 🔄 **Smart Caching** - Automatic response caching and invalidation
+- 🛠 **Developer Experience** - IntelliSense for API routes and responses
+
+```typescript
+// Example: Type-safe API client
+const api = Jetflare("https://api.example.com", {
+  GET_user: {
+    path: "/users/:id",
+    method: "get",
+    response: { id: "string", name: "string" },
+  },
+});
+
+// TypeScript knows the response shape
+const { data: user } = await api.GET_user({ params: { id: "123" } });
+console.log(user.name); // Type-safe property access
+```
 
 ## Table of Contents
 
-- [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Defining API Routes](#defining-api-routes)
-  - [HTTP Routes](#http-routes)
-  - [WebSocket Routes](#websocket-routes)
-  - [Server-Sent Events (SSE) Routes](#server-sent-events-sse-routes)
-- [Making API Calls](#making-api-calls)
-  - [GET Requests](#get-requests)
-  * [POST/PUT/PATCH Requests (with Body)](#postputpatch-requests-with-body)
-  * [Requests with Query Parameters](#requests-with-query-parameters)
-  * [Requests with Path Parameters](#requests-with-path-parameters)
-  * [File Uploads](#file-uploads)
-  * [Accessing WebSocket Connections](#accessing-websocket-connections)
-  * [Accessing SSE Connections](#accessing-sse-connections)
-- [Advanced Features](#advanced-features)
-  - [Request Payload Options](#request-payload-options)
-  - [Caching System](#caching-system)
-  - [Request Retries](#request-retries)
-  - [Request Cancellation](#request-cancellation)
-  - [Interceptors](#interceptors)
-- [Configuration](#configuration)
-  - [Global Configuration](#global-configuration)
-  - [Fluent API](#fluent-api)
-- [Error Handling](#error-handling)
+- [Core Concepts](#core-concepts)
+  - [Defining API Routes](#defining-api-routes)
+  - [Making Requests](#making-requests)
+  - [Type Safety](#type-safety)
+- [Guides](#guides)
+  - [REST API](#rest-api)
+  - [Real-time](#real-time)
+  - [Advanced Usage](#advanced-usage)
 - [API Reference](#api-reference)
-- [Examples](#examples)
 - [Contributing](#contributing)
 - [License](#license)
-
-## Features
-
-- **Strict Type Safety:** Leverage TypeScript for compile-time validation of API requests and responses.
-- **Intuitive Route Definition:** Define your API routes clearly with specified paths, HTTP methods, and payload schemas (body, query, params).
-- **Built-in Caching:** Intelligent caching system with automatic invalidation for GET requests.
-- **Automatic Retries:** Configure automatic retries for failed HTTP requests.
-- **Request Cancellation:** Cancel in-flight requests using `AbortController`.
-- **Upload/Download Progress:** Track progress for file uploads and downloads.
-- **Real-time Communication:** First-class support for WebSockets and Server-Sent Events.
-- **Interceptors:** Global request, response, and error interceptors for centralized logic.
-- **File Uploads:** Simplified handling of single and multiple file uploads.
-- **Configurable:** Set default headers, timeouts, and base URLs.
 
 ## Installation
 
 ```bash
+# Using npm
 npm install jetflare
-# or
+
+# Using yarn
 yarn add jetflare
-# or
+
+# Using pnpm
 pnpm add jetflare
 ```
 
 ## Quick Start
 
-Define your API routes and start making requests.
+1. **Define your API routes**
 
 ```typescript
-import { Jetflare, createRoutes } from "jetflare";
+import { Jetflare } from "jetflare";
 
-// 1. Define your API routes using createRoutes for type inference
-export const routes = createRoutes({
+const api = Jetflare("https://api.example.com", {
+  // GET /users
   GET_users: {
     path: "/users",
     method: "get",
-    title: "Get all users",
-    // Define expected query parameters for type safety
-    query: {
-      limit: 0, // number
-      isActive: false, // boolean
+    response: {
+      users: [
+        {
+          id: "string",
+          name: "string",
+          email: "string",
+        },
+      ],
     },
   },
+
+  // POST /users
   POST_user: {
     path: "/users",
     method: "post",
-    title: "Create new user",
-    // Define expected request body structure
     body: {
       name: "string",
       email: "string",
-      age: 0,
+    },
+    response: {
+      id: "string",
+      name: "string",
+      email: "string",
     },
   },
 });
-
-// 2. Initialize Jetflare with your API base URL and routes
-const jetflare = Jetflare(
-  "[https://api.example.com](https://api.example.com)",
-  routes
-);
-
-// 3. Make requests and handle responses
-async function fetchData() {
-  try {
-    // GET request with query parameters
-    const usersResponse = await jetflare.GET_users({
-      query: { limit: 5, isActive: true },
-    });
-    const usersData = await usersResponse.json();
-    console.log("All users:", usersData);
-
-    // POST request with a request body
-    const newUserResponse = await jetflare.POST_user({
-      body: { name: "Alice Smith", email: "alice@example.com", age: 28 },
-    });
-    const newUserData = await newUserResponse.json();
-    console.log("New user created:", newUserData);
-  } catch (error) {
-    console.error("API call failed:", error);
-  }
-}
-
-fetchData();
 ```
 
-## Defining API Routes
+2. **Make type-safe requests**
 
-Routes are defined as an object where each key is the function name for your API call, and its value is an object defining the endpoint. Use `createRoutes` to ensure proper type inference.
+```typescript
+// GET /users
+const { data } = await api.GET_users();
+// data is typed as { users: Array<{ id: string, name: string, email: string }> }
+
+// POST /users
+const newUser = await api.POST_user({
+  body: { name: "John", email: "john@example.com" },
+});
+// newUser.data is typed as { id: string, name: string, email: string }
+```
+
+## API Reference
+
+### createRoutes
 
 ```typescript
 import { createRoutes } from "jetflare";
 
-export const routes = createRoutes({
-  ROUTE_NAME: {
-    path: string, // The URL path, can include :params
-    method: "get" | "post" | "put" | "delete" | "patch" | "websocket" | "sse",
-    title?: string, // Optional, for documentation or debugging
-    headers?: Record<string, string>, // Optional, default headers for this route
-    invalidates?: string | string[], // Optional, cache keys to invalidate on success
-    body?: object, // Optional, type definition for request body (for POST, PUT, PATCH)
-    query?: object, // Optional, type definition for URL query parameters
-    params?: object, // Optional, type definition for URL path parameters (e.g., :id)
-  },
-  // ... more route definitions
+const routes = createRoutes({
+  // Define your API routes here
 });
 ```
 
-### HTTP Routes
+### Jetflare
 
-```typescript
-export const routes = createRoutes({
-  // Basic GET request with potential query parameters
-  GET_products: {
-    path: "/products",
-    method: "get",
-    query: {
-      category: "string",
-      minPrice: 0, // Example: number type
-      inStock: false, // Example: boolean type
-    },
-    title: "Get all products",
-  },
+GET_product_by_id: {
+path: "/products/:id",
+method: "get",
+params: {
+id: "string", // Example: string type for path parameter
+},
+title: "Get product by ID",
+},
 
-  // GET request with path parameters
-  GET_product_by_id: {
-    path: "/products/:id",
-    method: "get",
-    params: {
-      id: "string", // Example: string type for path parameter
-    },
-    title: "Get product by ID",
-  },
+// POST request with a request body, invalidates 'GET_products' cache on success
+CREATE_product: {
+path: "/products",
+method: "post",
+body: {
+name: "string",
+price: 0,
+description: "string",
+},
+invalidates: ["GET_products"], // Invalidate cache for 'GET_products'
+title: "Create a new product",
+},
 
-  // POST request with a request body, invalidates 'GET_products' cache on success
-  CREATE_product: {
-    path: "/products",
-    method: "post",
-    body: {
-      name: "string",
-      price: 0,
-      description: "string",
-    },
-    invalidates: ["GET_products"], // Invalidate cache for 'GET_products'
-    title: "Create a new product",
-  },
+// PUT request with path parameters and body, invalidates specific product cache
+UPDATE_product: {
+path: "/products/:id",
+method: "put",
+params: {
+id: "string",
+},
+body: {
+price: 0,
+},
+invalidates: ["GET_products", "GET_product_by_id"], // Invalidate multiple caches
+title: "Update a product",
+},
 
-  // PUT request with path parameters and body, invalidates specific product cache
-  UPDATE_product: {
-    path: "/products/:id",
-    method: "put",
-    params: {
-      id: "string",
-    },
-    body: {
-      price: 0,
-    },
-    invalidates: ["GET_products", "GET_product_by_id"], // Invalidate multiple caches
-    title: "Update a product",
-  },
+// DELETE request with path parameters
+DELETE_product: {
+path: "/products/:id",
+method: "delete",
+params: {
+id: "string",
+},
+invalidates: ["GET_products"], // Invalidate 'GET_products' cache
+title: "Delete a product",
+},
 
-  // DELETE request with path parameters
-  DELETE_product: {
-    path: "/products/:id",
-    method: "delete",
-    params: {
-      id: "string",
-    },
-    invalidates: ["GET_products"], // Invalidate 'GET_products' cache
-    title: "Delete a product",
-  },
-
-  // Example for file upload (handled via payload.body containing File objects)
-  UPLOAD_product_image: {
-    path: "/products/:id/image",
-    method: "post",
-    params: {
-      id: "string",
-    },
-    body: {
-      imageFile: {} as File, // Explicitly define as File or File[]
-      altText: "string",
-    },
-    title: "Upload product image",
-  },
+// Example for file upload (handled via payload.body containing File objects)
+UPLOAD_product_image: {
+path: "/products/:id/image",
+method: "post",
+params: {
+id: "string",
+},
+body: {
+imageFile: {} as File, // Explicitly define as File or File[]
+altText: "string",
+},
+title: "Upload product image",
+},
 });
-```
+
+````
 
 ### WebSocket Routes
 
@@ -250,7 +199,7 @@ export const routes = createRoutes({
     title: "Real-time chat",
   },
 });
-```
+````
 
 ### Server-Sent Events (SSE) Routes
 
@@ -1182,10 +1131,27 @@ setTimeout(() => {
 
 ---
 
+## API Reference
+
+### `Jetflare(baseUrl: string, routes: Routes): API`
+
+Create a new API client instance.
+
+### Route Definition
+
+| Property    | Type     | Description                                |
+| ----------- | -------- | ------------------------------------------ | ----- | -------- | ------- | ----------- | ------ | ----------- |
+| `path`      | `string` | URL path (supports `:param` placeholders)  |
+| `method`    | `'get'   | 'post'                                     | 'put' | 'delete' | 'patch' | 'websocket' | 'sse'` | HTTP method |
+| `response?` | `object` | Expected response shape for type inference |
+| `body?`     | `object` | Request body type definition               |
+| `query?`    | `object` | Query parameters type definition           |
+| `params?`   | `object` | Path parameters type definition            |
+
 ## Contributing
 
-We welcome contributions to Jetflare\! Please read our [contributing guidelines](./CONTRIBUTING.md) for details on how to submit pull requests, report bugs, and suggest features.
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 
-Jetflare is licensed under the MIT License. See the LICENSE file for more details.
+Jetflare is [MIT licensed](LICENSE).

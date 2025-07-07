@@ -52,6 +52,7 @@ export type RouteDefinition = {
   body?: object; // Use object as a placeholder for inference
   query?: object;
   params?: object;
+  response?: any;
 };
 
 // This type represents the overall routes object
@@ -172,7 +173,7 @@ class WebSocketManager {
 }
 
 // Enhanced API response
-class JetResponse {
+class JetResponse<T = any> {
   constructor(
     public response: Response,
     public cached: boolean = false,
@@ -195,7 +196,7 @@ class JetResponse {
     return this.response.url;
   }
 
-  async json<T = any>(): Promise<T> {
+  async json(): Promise<T> {
     return this.response.json();
   }
 
@@ -431,13 +432,33 @@ class JetflareCommon {
 
     // Add query string to cache key
     if (payload.query) {
-      const queryString = new URLSearchParams(payload.query).toString();
+      const queryString = new URLSearchParams(
+        this.flattenQuery(payload.query)
+      ).toString();
+      // const queryString = new URLSearchParams(payload.query).toString();
       if (queryString) {
         key += `?${queryString}`;
       }
     }
 
     return key;
+  }
+
+  private flattenQuery(obj: any, prefix = ""): Record<string, string> {
+    const result: Record<string, string> = {};
+
+    for (const key in obj) {
+      const value = obj[key];
+      const prefixedKey = prefix ? `${prefix}[${key}]` : key;
+
+      if (typeof value === "object" && value !== null) {
+        Object.assign(result, this.flattenQuery(value, prefixedKey));
+      } else {
+        result[prefixedKey] = String(value);
+      }
+    }
+
+    return result;
   }
 
   private async makeRequest(
@@ -583,6 +604,15 @@ class JetflareCommon {
 }
 
 // Update ApiFunction to apply WidenLiterals to the inferred types
+type JsonObject<T> = {
+  [P in keyof T]: T[P] extends object ? JsonObject<T[P]> : T[P];
+};
+
+type ResponseTypeOf<R> = R extends { response: infer Res }
+  ? JsonObject<WidenLiterals<Res>>
+  : any;
+
+// Update ApiFunction to apply WidenLiterals to the inferred types
 type ApiFunction<RouteDef extends routesType[keyof routesType]> = (
   payload?: ApiFunctionPayload<
     RouteDef["method"],
@@ -590,7 +620,7 @@ type ApiFunction<RouteDef extends routesType[keyof routesType]> = (
     WidenLiterals<RouteDef extends { query: infer Q } ? Q : never>,
     WidenLiterals<RouteDef extends { params: infer P } ? P : never>
   >
-) => Promise<JetResponse>;
+) => Promise<JetResponse<ResponseTypeOf<RouteDef>>>;
 
 type WebSocketFunction = (payload?: { protocols?: string | string[] }) => {
   connect: () => void;
@@ -620,7 +650,7 @@ export type API<routes extends routesType> = {
   wsManager: WebSocketManager;
   interceptors: {
     request: Set<(config: any) => any>;
-    response: Set<(response: JetResponse) => JetResponse>;
+    response: Set<(response: JetResponse<any>) => JetResponse<any>>;
     error: Set<(error: Error) => Error>;
   };
   setBaseURL: (url: string) => void;

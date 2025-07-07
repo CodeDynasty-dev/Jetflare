@@ -12,6 +12,11 @@ export const routes = {
       isActive: false,
       tags: [] as string[],
     },
+    response: {
+      a: "eggs",
+      b: "eggs",
+      c: "eggs",
+    },
   },
   GET_user_by_id: {
     path: "/users/:id",
@@ -73,6 +78,18 @@ export const routes = {
 // or remove it if you pass it directly to createRoutes()
 
 const jetflare = Jetflare("https://api.example.com", createRoutes(routes));
+
+// Type test: the response type of GET_users is inferred from the route definition
+async function typeTest() {
+  const res = await jetflare.GET_users();
+  const data = await res.json();
+  // The following line should have correct type inference:
+  // data.a, data.b, data.c should all be string ("eggs")
+  // @ts-expect-error: Property 'notAKey' does not exist
+  data.notAKey;
+  // Uncomment to see types:
+  // type Inferred = typeof data;
+}
 
 // Examples of how the new types enforce usage:
 
